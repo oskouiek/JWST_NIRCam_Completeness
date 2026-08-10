@@ -1,4 +1,4 @@
-"""Command line NIRCam completeness calculator
+"""Command-line NIRCam completeness calculator.
 
 Examples:
   # Mode 1: 50% completeness magnitude
@@ -70,8 +70,9 @@ def completeness_percent(filt, exposure_time, background, size, mag, coef_df, sh
     pct = erfc_curve(mag, d0, p, p1, p2, p3)
     if remove_confusion:
         plateau = erfc_curve(p1 - 10, d0, p, p1, p2, p3)
-        if plateau > 0:
-            pct = pct / plateau * 100.0
+        floor = erfc_curve(p1 + 10, d0, p, p1, p2, p3)
+        if plateau > floor:
+            pct = (pct - floor) / (plateau - floor) * 100.0
     return max(0.0, min(100.0, pct))
 
 
