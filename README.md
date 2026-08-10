@@ -20,8 +20,8 @@ command line version (`calc_cli.py`). Both give the same results.
 Requires Python 3.9 or newer.
 
 ```bash
-git clone https://github.com/<your-username>/nircam-completeness.git
-cd nircam-completeness
+git clone https://github.com/<your-username>/JWST_NIRCam_Completeness.git
+cd JWST_NIRCam_Completeness
 pip install -r requirements.txt
 ```
 
