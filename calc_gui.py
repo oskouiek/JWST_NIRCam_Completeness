@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
 
 FILTERS = ['F090W', 'F115W', 'F150W', 'F200W', 'F277W', 'F356W', 'F410M', 'F444W']
 
@@ -53,10 +52,11 @@ def completeness_percent(filt, exposure_time, background, size, mag, coef_df, sh
     pct = erfc_curve(mag, d0, p, p1, p2, p3)
 
     if remove_confusion:
-        # plateau = curve evaluated at a very bright magnitude
+        # plateau at bright end, floor at faint end
         plateau = erfc_curve(p1 - 10, d0, p, p1, p2, p3)
-        if plateau > 0:
-            pct = pct / plateau * 100.0
+        floor = erfc_curve(p1 + 10, d0, p, p1, p2, p3)
+        if plateau > floor:
+            pct = (pct - floor) / (plateau - floor) * 100.0
 
     return max(0.0, min(100.0, pct))
 
@@ -315,8 +315,6 @@ class MainWindow(QTabWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("NIRCam Completeness Calculator")
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.png")
-        self.setWindowIcon(QIcon(icon_path))
         df = load_coefficients()
         shape_df = load_shape_params()
         self.magnitude_tab = MagnitudeCalculatorTab(df)
