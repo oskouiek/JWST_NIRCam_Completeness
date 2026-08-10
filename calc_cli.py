@@ -2,13 +2,13 @@
 
 Examples:
   # Mode 1: 50% completeness magnitude
-  python3 completeness_cli.py --mode 1 --filter F090W --size 0.1 --background 0.3 --exposure 1000
+  python3 calc_cli.py --mode 1 --filter F090W --size 0.1 --background 0.3 --exposure 1000
 
   # Mode 2: completeness percentage at a given magnitude
-  python3 completeness_cli.py --mode 2 --filter F090W --size 0.1 --background 0.3 --exposure 1000 --mag 26
+  python3 calc_cli.py --mode 2 --filter F090W --size 0.1 --background 0.3 --exposure 1000 --mag 26
 
-  # Mode 2 without confusion (scaled to the plateau)
-  python3 completeness_cli.py --mode 2 --filter F090W --size 0.1 --background 0.3 --exposure 1000 --mag 26 --no-confusion
+  # Mode 2 raw (un-normalized, plateau below 100%)
+  python3 calc_cli.py --mode 2 --filter F090W --size 0.1 --background 0.3 --exposure 1000 --mag 26 --raw
 """
 
 import os
@@ -59,16 +59,23 @@ def completeness_mag_err(filt, exposure_time, background, size, df):
 
 
 def completeness_percent(filt, exposure_time, background, size, mag, coef_df, shape_df,
-                         remove_confusion=False):
-    p1 = completeness_mag(filt, exposure_time, background, size, coef_df)
+                         normalize=False):
+    m50 = completeness_mag(filt, exposure_time, background, size, coef_df)
     radii = shape_df['radius'].values
     lr = np.log10(np.clip(size, radii.min(), radii.max()))
     d0 = np.interp(lr, np.log10(radii), shape_df['d0'].values)
     p  = np.interp(lr, np.log10(radii), shape_df['p'].values)
     p2 = np.interp(lr, np.log10(radii), shape_df['p2'].values)
     p3 = np.interp(lr, np.log10(radii), shape_df['p3'].values)
+    # solve for the erfc center that puts the true-50% crossing at m50
+    from scipy.special import erfcinv
+    val = (50.0 - p3) / (0.5 * d0 * p2)
+    if 0 < val < 2:
+        p1 = m50 - erfcinv(val) / p
+    else:
+        p1 = m50
     pct = erfc_curve(mag, d0, p, p1, p2, p3)
-    if remove_confusion:
+    if normalize:
         plateau = erfc_curve(p1 - 10, d0, p, p1, p2, p3)
         floor = erfc_curve(p1 + 10, d0, p, p1, p2, p3)
         if plateau > floor:
@@ -80,12 +87,18 @@ def completeness_percent_err(filt, exposure_time, background, size, mag, coef_df
     radii = shape_df['radius'].values
     lr = np.log10(np.clip(size, radii.min(), radii.max()))
     logr = np.log10(radii)
-    p1 = completeness_mag(filt, exposure_time, background, size, coef_df)
+    m50 = completeness_mag(filt, exposure_time, background, size, coef_df)
     p1_err = completeness_mag_err(filt, exposure_time, background, size, coef_df)
     d0 = np.interp(lr, logr, shape_df['d0'].values)
     p  = np.interp(lr, logr, shape_df['p'].values)
     p2 = np.interp(lr, logr, shape_df['p2'].values)
     p3 = np.interp(lr, logr, shape_df['p3'].values)
+    from scipy.special import erfcinv
+    val = (50.0 - p3) / (0.5 * d0 * p2)
+    if 0 < val < 2:
+        p1 = m50 - erfcinv(val) / p
+    else:
+        p1 = m50
     d0_s = np.interp(lr, logr, shape_df['d0_std'].values)
     p_s  = np.interp(lr, logr, shape_df['p_std'].values)
     p2_s = np.interp(lr, logr, shape_df['p2_std'].values)
@@ -113,8 +126,9 @@ def main():
     parser.add_argument('--background', type=float, required=True, help="background, MJy/sr")
     parser.add_argument('--exposure', type=float, required=True, help="exposure time, seconds")
     parser.add_argument('--mag', type=float, help="object magnitude (required for mode 2)")
-    parser.add_argument('--no-confusion', action='store_true',
-                        help="mode 2 only: scale by the plateau to remove confusion")
+    parser.add_argument('--raw', action='store_true',
+                        help="mode 2 only: report raw (un-normalized) completeness; "
+                             "by default the result is normalized to the plateau")
     args = parser.parse_args()
 
     if not (0.01 <= args.size <= 1.0):
@@ -132,11 +146,12 @@ def main():
         if args.mag is None:
             parser.error("--mag is required for mode 2")
         shape = load_shape_params()
+        normalize = not args.raw
         pct = completeness_percent(args.filt, args.exposure, args.background, args.size,
-                                   args.mag, coef, shape, remove_confusion=args.no_confusion)
+                                   args.mag, coef, shape, normalize=normalize)
         err = completeness_percent_err(args.filt, args.exposure, args.background, args.size,
                                        args.mag, coef, shape)
-        tag = " (confusion removed)" if args.no_confusion else ""
+        tag = "" if normalize else " (raw, un-normalized)"
         line = f"Completeness at mag {args.mag:g}{tag}: {pct:.1f}% +/- {err:.1f}%"
         if args.mag < 20 or args.mag > 32:
             line += f"\nNote: magnitude {args.mag:g} is outside the tested range of 20-32; extrapolated."

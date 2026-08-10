@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtWidgets import (
     QApplication, QTabWidget, QWidget, QGridLayout, QComboBox, QLineEdit,
-    QLabel, QPushButton
+    QLabel, QPushButton, QCheckBox
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
@@ -41,13 +41,22 @@ def completeness_percent(filt, exposure_time, background, size, mag, coef_df, sh
     completeness against noise alone, with the confusion (field-crowding)
     suppression removed.
     """
-    p1 = completeness_mag(filt, exposure_time, background, size, coef_df)
+    m50 = completeness_mag(filt, exposure_time, background, size, coef_df)
     radii = shape_df['radius'].values
     lr = np.log10(np.clip(size, radii.min(), radii.max()))
     d0 = np.interp(lr, np.log10(radii), shape_df['d0'].values)
     p  = np.interp(lr, np.log10(radii), shape_df['p'].values)
     p2 = np.interp(lr, np.log10(radii), shape_df['p2'].values)
     p3 = np.interp(lr, np.log10(radii), shape_df['p3'].values)
+
+    # p1 (erfc center) is not the true-50% crossing when the plateau < 100.
+    # Solve for the p1 that puts the true-50% crossing at m50.
+    from scipy.special import erfcinv
+    val = (50.0 - p3) / (0.5 * d0 * p2)
+    if 0 < val < 2:
+        p1 = m50 - erfcinv(val) / p
+    else:
+        p1 = m50
 
     pct = erfc_curve(mag, d0, p, p1, p2, p3)
 
@@ -71,13 +80,21 @@ def completeness_percent_err(filt, exposure_time, background, size, mag, coef_df
     lr = np.log10(np.clip(size, radii.min(), radii.max()))
     logr = np.log10(radii)
 
-    p1 = completeness_mag(filt, exposure_time, background, size, coef_df)
+    m50 = completeness_mag(filt, exposure_time, background, size, coef_df)
     p1_err = completeness_mag_err(filt, exposure_time, background, size, coef_df)
 
     d0 = np.interp(lr, logr, shape_df['d0'].values)
     p  = np.interp(lr, logr, shape_df['p'].values)
     p2 = np.interp(lr, logr, shape_df['p2'].values)
     p3 = np.interp(lr, logr, shape_df['p3'].values)
+
+    # solve for the erfc center that puts the true-50% crossing at m50
+    from scipy.special import erfcinv
+    val = (50.0 - p3) / (0.5 * d0 * p2)
+    if 0 < val < 2:
+        p1 = m50 - erfcinv(val) / p
+    else:
+        p1 = m50
     d0_s = np.interp(lr, logr, shape_df['d0_std'].values)
     p_s  = np.interp(lr, logr, shape_df['p_std'].values)
     p2_s = np.interp(lr, logr, shape_df['p2_std'].values)
@@ -170,14 +187,19 @@ class MagnitudeCalculatorTab(QWidget):
 
         self.object_size = QLineEdit()
         self.object_size.setPlaceholderText("0.01 to 1.0")
+        self.object_size.returnPressed.connect(self.calculate_output)
 
         self.background = QLineEdit()
         self.background.setPlaceholderText("Enter background in MJy/sr")
+        self.background.returnPressed.connect(self.calculate_output)
 
         self.exposure_time = QLineEdit()
         self.exposure_time.setPlaceholderText("Enter exposure time in seconds")
+        self.exposure_time.returnPressed.connect(self.calculate_output)
 
         self.calculate_button = QPushButton("Calculate")
+        self.calculate_button.setDefault(True)
+        self.calculate_button.setAutoDefault(True)
         self.calculate_button.clicked.connect(self.calculate_output)
 
         self.output_label = QLabel("Output will be displayed here")
@@ -237,24 +259,31 @@ class ProbabilityCalculatorTab(QWidget):
 
         self.filter_box = QComboBox()
         self.filter_box.addItems(FILTERS)
+        
 
         self.object_size = QLineEdit()
         self.object_size.setPlaceholderText("0.01 to 1.0")
+        self.object_size.returnPressed.connect(self.calculate_output)
 
         self.background = QLineEdit()
         self.background.setPlaceholderText("Enter background in MJy/sr")
+        self.background.returnPressed.connect(self.calculate_output)
 
         self.exposure_time = QLineEdit()
         self.exposure_time.setPlaceholderText("Enter exposure time in seconds")
+        self.exposure_time.returnPressed.connect(self.calculate_output)
 
         self.magnitude = QLineEdit()
         self.magnitude.setPlaceholderText("Enter object magnitude")
+        self.magnitude.returnPressed.connect(self.calculate_output)
 
-        confusion_label = QLabel("Confusion:")
-        self.confusion_box = QComboBox()
-        self.confusion_box.addItems(["With confusion", "Without confusion"])
+        normalize_label = QLabel("Normalize:")
+        self.normalize_box = QCheckBox()
+        self.normalize_box.setChecked(True)
 
         self.calculate_button = QPushButton("Calculate")
+        self.calculate_button.setDefault(True)
+        self.calculate_button.setAutoDefault(True)
         self.calculate_button.clicked.connect(self.calculate_output)
 
         self.output_label = QLabel("Output will be displayed here")
@@ -271,8 +300,8 @@ class ProbabilityCalculatorTab(QWidget):
         layout.addWidget(self.exposure_time,  3, 1)
         layout.addWidget(magnitude_label,     4, 0)
         layout.addWidget(self.magnitude,      4, 1)
-        layout.addWidget(confusion_label,     5, 0)
-        layout.addWidget(self.confusion_box,  5, 1)
+        layout.addWidget(normalize_label,     5, 0)
+        layout.addWidget(self.normalize_box,  5, 1)
         layout.addWidget(self.calculate_button, 6, 0, 1, 2)
         layout.addWidget(self.output_label,     7, 0, 1, 2)
 
@@ -283,7 +312,7 @@ class ProbabilityCalculatorTab(QWidget):
             background = float(self.background.text())
             exposure_time = float(self.exposure_time.text())
             mag = float(self.magnitude.text())
-            remove_confusion = self.confusion_box.currentText() == "Without confusion"
+            remove_confusion = self.normalize_box.isChecked()
 
             if not (0.01 <= size <= 1.0):
                 self.output_label.setText("Object size must be between 0.01 and 1.0 arcsec.")
@@ -344,6 +373,18 @@ class MainWindow(QTabWidget):
             QTabBar::tab:selected { background-color: #1E90FF; }
             QTabBar::tab:hover { background-color: #63B8FF; }
         """)
+        self._previous_index = self.currentIndex()
+        self.currentChanged.connect(self.sync_fields)
+
+    def sync_fields(self, new_index):
+        src = self.widget(self._previous_index)
+        dst = self.widget(new_index)
+        if src is not None and dst is not None and src is not dst:
+            dst.filter_box.setCurrentText(src.filter_box.currentText())
+            dst.object_size.setText(src.object_size.text())
+            dst.background.setText(src.background.text())
+            dst.exposure_time.setText(src.exposure_time.text())
+        self._previous_index = new_index
 
 
 if __name__ == "__main__":
