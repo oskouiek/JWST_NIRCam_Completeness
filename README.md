@@ -4,8 +4,8 @@ A tool for estimating source completeness in JWST NIRCam imaging, based on the
 SKYSURF-IR completeness analysis. It models completeness as a function of
 filter, exposure time, background, and object effective radius.
 
-There are two ways to use it: a graphical app (`calc_gui.py`) and a
-command-line version (`calc_cli.py`). Both give the same results.
+There are two ways to use it: a graphical interface (`calc_gui.py`) and a
+command line version (`calc_cli.py`). Both give the same results.
 
 ## What it does
 
@@ -13,7 +13,7 @@ command-line version (`calc_cli.py`). Both give the same results.
   of a given size are recovered, for your chosen filter, exposure time, and
   background.
 - **Completeness percentage** — the fraction of sources recovered at a specific
-  magnitude, with an option to remove the confusion (field-crowding) effect.
+  magnitude, with an option to remove the confusion (field crowding) effect.
 
 ## Installation
 
@@ -25,12 +25,12 @@ cd nircam-completeness
 pip install -r requirements.txt
 ```
 
-The GUI needs PyQt6. The command-line version does not — if you only want the
+The GUI needs PyQt6. The command-line version does not. If you only want the
 CLI, you can skip PyQt6 and install just numpy, pandas, and scipy.
 
 ## Files
 
-- `calc_gui.py` — graphical calculator (two tabs)
+- `calc_gui.py` — graphical calculator
 - `calc_cli.py` — command-line calculator
 - `coefficients.csv` — model coefficients per filter and radius
 - `shape_params.csv` — completeness-curve shape parameters per radius
@@ -96,4 +96,4 @@ python3 calc_cli.py --help
 ## Citation
 
 If you use this tool, please cite the SKYSURF-IR completeness paper (Oskouie et
-al., in preparation).
+al.).
