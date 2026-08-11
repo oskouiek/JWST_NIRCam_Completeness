@@ -1,4 +1,4 @@
-# NIRCam Completeness Calculator
+# NIRCam Imaging Completeness Calculator
 
 A tool for estimating source completeness in JWST NIRCam imaging, based on the
 SKYSURF-IR completeness analysis. It models completeness as a function of
@@ -84,16 +84,16 @@ python3 calc_cli.py --help
 - **size** — object effective radius in arcseconds, from 0.01 to 1.0
 - **background** — sky background in MJy/sr
 - **exposure** — exposure time in seconds
-- **mag** — object AB magnitude (mode 2 only); tested range is 20 to 32
+- **mag** - object AB magnitude (mode 2 only); tested range is 20 to 32
 
 ## Notes
 
 - Results are calibrated on the SKYSURF-IR sample and are most reliable within
-  the tested magnitude range of 20 to 32. Values outside this range are
+  the tested magnitude range of 20 to 32 AB. Values outside this range are
   extrapolated and flagged as such.
 - By default, mode 2 (and the GUI's Normalize checkbox) normalizes the
   completeness so the curve spans 0% to 100%. The raw, un-normalized result
-  reflects completeness as actually observed, where the bright-end plateau falls
+  reflects completeness as *actually observed*, where the bright-end plateau falls
   below 100% because injected sources can land on real objects. Normalizing
   subtracts the faint-end floor and divides by that plateau to isolate detection
   against noise alone.
