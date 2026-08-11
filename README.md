@@ -11,9 +11,11 @@ command line version (`calc_cli.py`). Both give the same results.
 
 - **50% completeness magnitude** — the magnitude at which half of the sources
   of a given size are recovered, for your chosen filter, exposure time, and
-  background.
+  background. Only meaningful for deep images without any major obstructions.
 - **Completeness percentage** — the fraction of sources recovered at a specific
-  magnitude, with an option to remove the confusion (field crowding) effect.
+  magnitude, with an option to normalize the curve by subtracting the faint-end
+  floor and dividing by the bright-end plateau, isolating detection against
+  noise from the confusion (field-crowding) effect.
 
 ## Installation
 
@@ -38,17 +40,16 @@ CLI, you can skip PyQt6 and install just numpy, pandas, and scipy.
 
 Both `.csv` files must stay in the same folder as the scripts.
 
-## Graphical use
+## GUI use
 
 ```bash
 python3 calc_gui.py
 ```
 
 Tab 1 returns the 50% completeness magnitude. Tab 2 returns the completeness
-percentage at a magnitude you enter, with a toggle for including or removing
-confusion.
+percentage at a magnitude you enter, with a Normalize checkbox (on by default).
 
-## Command-line use
+## CLI use
 
 Mode 1 — 50% completeness magnitude:
 
@@ -62,11 +63,13 @@ Mode 2 — completeness percentage at a magnitude:
 python3 calc_cli.py --mode 2 --filter F090W --size 0.1 --background 0.3 --exposure 1000 --mag 26
 ```
 
-Add `--no-confusion` to scale by the plateau and report detection completeness
-with confusion removed:
+By default, mode 2 normalizes the result (subtracts the floor and divides by the
+plateau) so the curve runs from 0% to 100%. Add `--raw` to report the raw,
+un-normalized completeness instead, where the bright-end plateau falls below
+100%:
 
 ```bash
-python3 calc_cli.py --mode 2 --filter F090W --size 0.1 --background 0.3 --exposure 1000 --mag 26 --no-confusion
+python3 calc_cli.py --mode 2 --filter F090W --size 0.1 --background 0.3 --exposure 1000 --mag 26 --raw
 ```
 
 For a full list of options:
@@ -88,10 +91,12 @@ python3 calc_cli.py --help
 - Results are calibrated on the SKYSURF-IR sample and are most reliable within
   the tested magnitude range of 20 to 32. Values outside this range are
   extrapolated and flagged as such.
-- The "with confusion" percentage reflects completeness as actually observed,
-  where the bright-end plateau falls below 100% because injected sources can
-  land on real objects. The "without confusion" option divides by that plateau
-  to isolate detection against noise alone.
+- By default, mode 2 (and the GUI's Normalize checkbox) normalizes the
+  completeness so the curve spans 0% to 100%. The raw, un-normalized result
+  reflects completeness as actually observed, where the bright-end plateau falls
+  below 100% because injected sources can land on real objects. Normalizing
+  subtracts the faint-end floor and divides by that plateau to isolate detection
+  against noise alone.
 
 ## Citation
 
