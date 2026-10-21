@@ -1,4 +1,4 @@
-# NIRCam Imaging Completeness Calculator
+# NIRCam Imaging Completeness Estimator (NICE)
 
 A tool for estimating source completeness in JWST NIRCam imaging, based on the
 SKYSURF-IR completeness analysis. It models completeness as a function of
